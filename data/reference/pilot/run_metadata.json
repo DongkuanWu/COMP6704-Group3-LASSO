@@ -1,0 +1,65 @@
+{
+  "python": "3.12.14",
+  "numpy": "2.3.5",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "tolerance": 0.0001,
+  "max_iterations": 1200,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "cases": {
+    "baseline": [
+      96,
+      192,
+      10,
+      0.02,
+      0.05
+    ],
+    "fewer_measurements": [
+      64,
+      192,
+      10,
+      0.02,
+      0.05
+    ],
+    "less_sparse": [
+      96,
+      192,
+      24,
+      0.02,
+      0.05
+    ],
+    "more_noise": [
+      96,
+      192,
+      10,
+      0.08,
+      0.05
+    ],
+    "lower_lambda": [
+      96,
+      192,
+      10,
+      0.02,
+      0.01
+    ],
+    "higher_lambda": [
+      96,
+      192,
+      10,
+      0.02,
+      0.15
+    ]
+  },
+  "lambda_rule": "lambda_factor * ||A.T @ b||_infinity",
+  "admm_rho": 1.0
+}
