@@ -1,0 +1,105 @@
+{
+  "python": "3.12.14",
+  "numpy": "2.3.5",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cases": {
+    "baseline": [
+      96,
+      192,
+      10,
+      0.02,
+      0.05
+    ],
+    "fewer_measurements": [
+      64,
+      192,
+      10,
+      0.02,
+      0.05
+    ],
+    "more_measurements": [
+      128,
+      192,
+      10,
+      0.02,
+      0.05
+    ],
+    "more_sparse": [
+      96,
+      192,
+      5,
+      0.02,
+      0.05
+    ],
+    "less_sparse": [
+      96,
+      192,
+      24,
+      0.02,
+      0.05
+    ],
+    "no_noise": [
+      96,
+      192,
+      10,
+      0,
+      0.05
+    ],
+    "more_noise": [
+      96,
+      192,
+      10,
+      0.08,
+      0.05
+    ],
+    "lower_lambda": [
+      96,
+      192,
+      10,
+      0.02,
+      0.01
+    ],
+    "higher_lambda": [
+      96,
+      192,
+      10,
+      0.02,
+      0.15
+    ],
+    "larger_problem": [
+      192,
+      384,
+      20,
+      0.02,
+      0.05
+    ]
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "repeats": 5,
+  "tolerance": 0.0001,
+  "bootstrap_resamples": 2000,
+  "statistic": "mean across 20 seeds of within-seed median of five timings",
+  "timing_order": "shuffled within each case and seed",
+  "note": "bootstrap intervals reflect instance variation; not hardware generalization"
+}
