@@ -160,3 +160,15 @@ The FISTA presentation also contains a separate supplementary study of 2,000 run
 `tools/verify.py` checks combination coverage, convergence status and within-instance timing medians. It reconstructs the summary and paired-comparison means and bootstrap intervals from individual runs. Floating-point libraries can produce small numerical differences; execution times also depend on hardware and system load.
 
 Useful extensions include comparing ADMM's explicit inverse with Cholesky-based solves on paired instances, measuring cold setup separately from reuse across right-hand sides, and conducting a noise sweep with fixed $\lambda$. The latter would separate noise sensitivity from the current data-dependent regularization rule.
+
+## 9. Contributors
+
+Project contributors (listed by the contact addresses supplied by the team):
+
+- [jiajieliu.pku@gmail.com](mailto:jiajieliu.pku@gmail.com)
+- [wenzhao.dong@connect.polyu.hk](mailto:wenzhao.dong@connect.polyu.hk)
+- [dwzh1677@gmail.com](mailto:dwzh1677@gmail.com)
+
+## 10. Report update
+
+The expanded LaTeX report includes LASSO optimality conditions, the critical regularization threshold, a soft-thresholding derivation, ISTA/FISTA objective-gap bounds, dense implementation costs, and an ADMM time-decomposition table. Remaining time after setup includes initialization and convergence checks; it is not an isolated iterative-loop benchmark. The report retains the archived total-time comparison and distinguishes observed results from untested factorization-reuse scenarios.
