@@ -163,7 +163,7 @@ Useful extensions include comparing ADMM's explicit inverse with Cholesky-based 
 
 ## 9. Contributors
 
-Project contributors (listed by the contact addresses supplied by the team):
+Project contributors:
 
 - [jiajieliu.pku@gmail.com](mailto:jiajieliu.pku@gmail.com)
 - [wenzhao.dong@connect.polyu.hk](mailto:wenzhao.dong@connect.polyu.hk)
