@@ -29,7 +29,11 @@ We therefore evaluate the methods at four levels. Objective values establish num
 
 The study makes three empirical contributions. First, it compares the three methods over ten controlled configurations and 200 problem instances, with 3,000 timed runs. Second, it decomposes ADMM time and measures within-instance timing variation, exposing the implementation and measurement effects behind the elapsed-time results. Third, it examines how measurement count, sparsity, noise and regularization alter recovery quality after convergence. The resulting analysis identifies precisely which rankings hold in the archived benchmark and which experimental changes are needed to test additional explanations.
 
-\section{Problem formulation and related methods}
+
+\paragraph{Connection to sparse estimation.}
+LASSO was introduced as a method for simultaneous shrinkage and variable selection \citep{tibshirani1996}. Here its coefficients represent a synthetic sparse signal rather than predictors selected from an observational dataset. The same squared-loss model links these interpretations, but recovery of the true support requires assumptions on the sensing matrix, noise and signal amplitudes. Sparsity alone does not guarantee identifiability. Proximal methods exploit the separability of the penalty \citep{parikh2014}, while the split formulation of ADMM separates the fitting and shrinkage operations. Our comparison studies these computational choices at fixed problem instances.
+
+\section{Methodology}
 \subsection{Observation model and objective}
 Let $A\in\mathbb{R}^{m\times n}$ be a known measurement matrix, $x^\star\in\mathbb{R}^n$ an unknown signal, and $\varepsilon\in\mathbb{R}^m$ additive noise. The input observations satisfy
 \begin{equation}
@@ -48,6 +52,20 @@ We distinguish optimization accuracy from reconstruction quality. Objective agre
 \end{equation}
 Noise and shrinkage bias can leave a nonzero reconstruction error even after the optimization has converged.
 
+
+\paragraph{Optimality and the critical penalty.}
+For $\lambda>0$, the objective is continuous and coercive, so a minimizer exists. Write $\widehat x$ for a minimizer and reserve $x^\star$ for the true signal. Convex optimality is equivalent to
+\begin{equation}
+0\in A^\top(A\widehat x-b)+\lambda\partial\|\widehat x\|_1,
+\qquad
+[A^\top(b-A\widehat x)]_i\in
+\begin{cases}
+\{\lambda\operatorname{sign}(\widehat x_i)\},&\widehat x_i\ne0,\\
+[-\lambda,\lambda],&\widehat x_i=0.
+\end{cases}
+\end{equation}
+Consequently, zero is a minimizer if and only if $\lambda\ge\lambda_{\max}:=\|A^\top b\|_\infty$. Our choice $\lambda=\alpha\lambda_{\max}$ expresses the penalty relative to this threshold. On an active coordinate the residual correlation has magnitude $\lambda$, explaining the shrinkage bias even with noiseless data. Uniqueness is a separate issue: one sufficient condition is full column rank of $A_E$, where $E=\{i:|a_i^\top(b-A\widehat x)|=\lambda\}$ is the equicorrelation set \citep{tibshirani2013}. Full rank of only one solution's active columns is not a general uniqueness certificate.
+
 \subsection{ISTA and FISTA}
 The gradient $\nabla f(x)=A^\top(Ax-b)$ has Lipschitz constant $L=\|A\|_2^2$. Define the componentwise soft-thresholding operator
 \begin{equation}
@@ -65,14 +83,164 @@ FISTA applies this step at an extrapolated point $y_k$. Starting from $x_0=y_0=0
 \end{align}
 Both methods mainly use dense matrix--vector products per iteration. The acceleration mechanism can reduce the number of updates, while adding vector operations at each step \citep{beck2009}. Soft thresholding is the proximal map of the $\ell_1$ penalty.
 
-\subsection{ADMM}
-ADMM introduces $z$ with the constraint $x=z$, separating the quadratic loss from the nonsmooth penalty \citep{boyd2011}. With scaled dual variable $u$ and $\rho=1$, the updates are
+
+\paragraph{Why soft thresholding solves the proximal step.}
+The bound $\|\nabla f(x)-\nabla f(y)\|_2\le L\|x-y\|_2$ yields
+$f(x)\le f(y)+\langle\nabla f(y),x-y\rangle+(L/2)\|x-y\|_2^2$.
+Minimizing this upper bound plus $\lambda\|x\|_1$ reduces, coordinate by coordinate, to minimizing
+$\frac12(v_i-x_i)^2+(\lambda/L)|x_i|$ with $v=y-\nabla f(y)/L$.
+The scalar condition $0\in x_i-v_i+(\lambda/L)\partial|x_i|$ gives $v_i-\lambda/L$ for $v_i>\lambda/L$, $v_i+\lambda/L$ for $v_i<-\lambda/L$, and zero otherwise. This is precisely soft thresholding \citep{parikh2014}.
+
+\paragraph{Descent and convergence rates.}
+Let $G_L(x)=L[x-S_{\lambda/L}(x-\nabla f(x)/L)]$. Its zero set is the LASSO solution set. Strong convexity of the quadratic surrogate gives the correct ISTA descent inequality
+\begin{equation}
+F(x_{k+1})\le F(x_k)-\frac{1}{2L}\|G_L(x_k)\|_2^2.
+\end{equation}
+Thus the objective is nonincreasing, with strict decrease at a nonstationary iterate in exact arithmetic. For any minimizer $\widehat x$, fixed-step ISTA and FISTA satisfy \citep{beck2009}
 \begin{align}
- x_{k+1}&=(A^\top A+\rho I)^{-1}\big[A^\top b+\rho(z_k-u_k)\big],\\
- z_{k+1}&=S_{\lambda/\rho}(x_{k+1}+u_k),\\
- u_{k+1}&=u_k+x_{k+1}-z_{k+1}.
+F(x_k^{\rm ISTA})-F(\widehat x)&\le\frac{L\|x_0-\widehat x\|_2^2}{2k},\\
+F(x_k^{\rm FISTA})-F(\widehat x)&\le\frac{2L\|x_0-\widehat x\|_2^2}{(k+1)^2}.
 \end{align}
-Our implementation explicitly forms the inverse once per timed run and reuses it during iteration. This choice exposes a substantial preparation cost for small dense instances. The returned estimate is $z$. A reusable matrix factorization would give a different timing profile.
+These are objective-gap guarantees, not rates for our normalized residual or reconstruction error. FISTA need not decrease the objective at every update. Disabling extrapolation recovers the ISTA update, making ISTA a momentum-free algorithmic control; the recorded timing difference also includes the overhead of the distinct implementations.
+
+\paragraph{Dense implementation cost.}
+Computing the exact spectral norm by a dense SVD costs $O(m^2n)$ for $m<n$ and is outside the timers. Each ISTA/FISTA gradient uses $A^\top(Ax)$ without forming the Gram matrix, giving $O(mn)$ work per iteration and $O(mn+n)$ storage. Thresholding and momentum require $O(n)$ vector work. Precomputing $A^\top b$ costs $O(mn)$ and is also outside these two solvers' timers. Residual checks perform additional matrix-vector products at scheduled checkpoints. Therefore the theoretical iteration bounds do not directly specify elapsed-time rankings.
+
+\subsection{ADMM}
+% ADMM introduces $z$ with the constraint $x=z$, separating the quadratic loss from the nonsmooth penalty \citep{boyd2011}. With scaled dual variable $u$ and $\rho=1$, the updates are
+% \begin{align}
+%  x_{k+1}&=(A^\top A+\rho I)^{-1}\big[A^\top b+\rho(z_k-u_k)\big],\\
+%  z_{k+1}&=S_{\lambda/\rho}(x_{k+1}+u_k),\\
+%  u_{k+1}&=u_k+x_{k+1}-z_{k+1}.
+% \end{align}
+% Our implementation explicitly forms the inverse once per timed run and reuses it during iteration. This choice exposes a substantial preparation cost for small dense instances. The returned estimate is $z$. A reusable matrix factorization would give a different timing profile.
+\label{subsec:admm}
+
+Unlike ISTA and FISTA, which directly optimize the composite
+objective through proximal gradient updates, the Alternating
+Direction Method of Multipliers (ADMM) separates the smooth
+data-fitting term from the nonsmooth sparsity penalty through
+variable splitting~\citep{boyd2011}.
+Specifically, the original LASSO problem is equivalently
+reformulated as
+\begin{equation}
+\begin{aligned}
+\min_{x,z}\quad &
+\frac{1}{2}\|Ax-b\|_2^2+\lambda\|z\|_1,\\
+\mathrm{s.t.}\quad & x=z.
+\end{aligned}
+\end{equation}
+Here, $x$ is responsible for data fidelity, while $z$
+promotes sparsity. The equality constraint ensures that
+the reformulated problem preserves the original solution.
+
+\paragraph{Augmented Lagrangian.}
+Introducing the dual variable $y$ and penalty parameter
+$\rho>0$, the augmented Lagrangian is defined as
+\begin{equation}
+\begin{aligned}
+\mathcal{L}_{\rho}(x,z,y)
+=&\frac{1}{2}\|Ax-b\|_2^2+\lambda\|z\|_1\\
+&+y^\top(x-z)
++\frac{\rho}{2}\|x-z\|_2^2.
+\end{aligned}
+\end{equation}
+The quadratic penalty discourages violations of the
+constraint $x=z$, while the dual variable tracks the
+remaining disagreement. Defining the scaled dual variable
+$u=y/\rho$, ADMM alternately updates $x$, $z$, and $u$.
+
+\paragraph{Alternating Updates.}
+The $x$-update minimizes the quadratic subproblem
+\begin{equation}
+x_{k+1}=
+\arg\min_x
+\left\{
+\frac{1}{2}\|Ax-b\|_2^2+
+\frac{\rho}{2}\|x-z_k+u_k\|_2^2
+\right\}.
+\end{equation}
+Setting its gradient to zero gives
+\begin{equation}
+(A^\top A+\rho I)x_{k+1}
+=A^\top b+\rho(z_k-u_k),
+\end{equation}
+and consequently,
+\begin{equation}
+x_{k+1}=
+(A^\top A+\rho I)^{-1}
+\left[A^\top b+\rho(z_k-u_k)\right].
+\end{equation}
+Since $A^\top A+\rho I$ is positive definite for
+$\rho>0$, the $x$-subproblem has a unique solution.
+
+The $z$-update handles the nonsmooth sparsity penalty:
+\begin{equation}
+z_{k+1}=
+\arg\min_z
+\left\{
+\lambda\|z\|_1+
+\frac{\rho}{2}\|x_{k+1}-z+u_k\|_2^2
+\right\}.
+\end{equation}
+This subproblem admits a closed-form solution through
+elementwise soft-thresholding:
+\begin{equation}
+z_{k+1}=S_{\lambda/\rho}(x_{k+1}+u_k).
+\end{equation}
+The threshold $\lambda/\rho$ controls coefficient
+shrinkage, setting sufficiently small coefficients
+exactly to zero. Finally, the scaled dual variable is
+updated as
+\begin{equation}
+u_{k+1}=u_k+x_{k+1}-z_{k+1},
+\end{equation}
+which accumulates the constraint violation and
+encourages agreement between the two variables.
+
+\paragraph{Convergence and Stopping Criteria.}
+Under the standard assumptions of closed, proper,
+convex objectives and the existence of a saddle point,
+two-block ADMM converges to a primal-dual solution
+\citep{boyd2011}. Its convergence can be monitored
+through the primal and dual residuals,
+\begin{equation}
+\begin{aligned}
+r_{k+1}&=x_{k+1}-z_{k+1},\\
+s_{k+1}&=\rho(z_{k+1}-z_k).
+\end{aligned}
+\end{equation}
+The primal residual measures disagreement between
+$x$ and $z$, while the dual residual measures changes
+in the sparsity variable. In our experiments, ADMM
+must satisfy the shared normalized proximal-gradient
+optimality criterion together with the additional
+normalized primal and dual residual thresholds.
+
+\paragraph{Computational Complexity and Implementation.}
+For a dense matrix $A\in\mathbb{R}^{m\times n}$,
+explicitly forming $A^\top A$ requires
+$O(mn^2)$ operations, followed by $O(n^3)$
+matrix inversion. Once the inverse is available,
+each $x$-update requires $O(n^2)$ operations,
+while the $z$- and $u$-updates require $O(n)$.
+
+In our implementation, we fix $\rho=1$ and
+initialize $x=z=u=0$. The inverse of
+$A^\top A+\rho I$ is computed once per timed run and reused throughout its iterations.
+The matrix preparation cost is included in the
+recorded execution time, and the final solution
+is evaluated using $z$.
+
+Although this implementation reduces repeated
+linear-system computations, explicit inversion
+introduces substantial setup overhead in our
+small dense benchmark. This cost is not intrinsic
+to ADMM: reusable matrix factorizations or
+iterative linear solvers provide alternative
+implementations. Therefore, the measured runtime
+reflects both the optimization method and its
+numerical implementation.
 
 \section{Experimental design}
 \subsection{Data generation and configurations}
@@ -117,7 +285,7 @@ Shared data generation and the spectral-norm calculation occur before timing. IS
 
 The recorded environment was Python 3.12.14 and NumPy 2.3.5 on Windows 11. The original study did not record CPU affinity, BLAS thread count or a dedicated warm-up phase. Median timing, randomized order and paired intervals reduce sensitivity to occasional delays, while residual system noise remains relevant at the millisecond scale. Intervals are exploratory, with no multiplicity correction.
 
-\section{Results and analysis}
+\section{Experimental Results and Analysis}
 \subsection{Objective agreement and iteration counts}
 All 3,000 runs reached their stopping thresholds. The maximum difference among the three final objective values on one instance was $2.30\times10^{-6}$. Baseline mean relative reconstruction errors were 8.47\% for ISTA, 8.46\% for FISTA and 8.46\% for ADMM. This close agreement supports comparing their computational behavior at similar achieved solution quality.
 
@@ -194,6 +362,24 @@ Removing the measured setup component gives an accounting estimate of time alrea
 \end{axis}\end{tikzpicture}
 \caption{Additive ADMM time decomposition across all configurations. For each seed, preparation and total time come from the same run whose total time is the median of five repeats. Components are then averaged over twenty seeds.}\label{fig:setup}
 \end{figure}
+
+
+\begin{table}[htbp]\centering\small
+\caption{ADMM accounting decomposition in milliseconds. Each seed selects the run with median total time; all components use that same run and are then averaged across twenty seeds.}
+\begin{tabular}{lrrr}\toprule
+Condition & Total & Preparation & Remaining \\\midrule
+Baseline & 48.83 & 47.77 & 1.06 \\
+Fewer measurements & 23.39 & 22.08 & 1.30 \\
+More measurements & 24.25 & 23.41 & 0.85 \\
+More sparse & 21.36 & 20.43 & 0.92 \\
+Less sparse & 27.49 & 25.78 & 1.71 \\
+No noise & 24.00 & 23.16 & 0.84 \\
+Higher noise & 33.48 & 32.31 & 1.17 \\
+Weaker regularization & 26.45 & 24.42 & 2.03 \\
+Stronger regularization & 19.60 & 18.87 & 0.73 \\
+Double dimensions & 92.03 & 90.13 & 1.90 \\
+\bottomrule\end{tabular}\end{table}
+The remaining-time means are below the corresponding ISTA and FISTA total-time means in all ten configurations. This is a descriptive component comparison with unequal timing boundaries. The remaining interval includes initialization, updates and scheduled checks; it is not an isolated update-loop timer or a measurement of a solver that reuses preparation across independent queries. Repeated right-hand-side experiments would be needed to establish the end-to-end benefit of such reuse. We therefore retain total measured time as the primary comparison.
 
 \subsection{Observed timing variability and confidence intervals}
 Figure~\ref{fig:variation} examines variability while holding the input instance fixed. For each seed we compute the range of its five times divided by their median. The median of these relative ranges across twenty baseline seeds is 40.4\% for ISTA, 42.4\% for FISTA and 82.4\% for ADMM. The raw timings therefore contain substantial within-instance variability. The larger ADMM variation also appears in its baseline confidence interval, whose width is 42.27 ms, compared with 0.61 ms for ISTA and 0.42 ms for FISTA.
@@ -279,7 +465,7 @@ The historical software environment and seeds are recorded, but hardware details
 
 The separate 2,000-run supplementary experiment in the FISTA presentation is outside the shared evidence used here. Its full source and per-run records were not available in the assembled materials. All three-way comparisons in this report use the archived shared study.
 
-\section{Conclusion}
+\section{Conclusions}
 The three solvers reached their specified thresholds in all 3,000 runs, with a maximum within-instance objective spread of $2.30\times10^{-6}$. FISTA reduced mean time in nine of ten configurations. Its baseline reduction was 17.9\%, increasing to 60.9\% under weaker regularization. ADMM achieved the lowest mean iteration count in every configuration, while preparation consumed 92.33--97.93\% of its measured total time under the same-run decomposition. Across the three baseline penalty values, increasing $\alpha$ from 0.01 to 0.15 cut FISTA time by 50.6\% and raised recovery error from 5.26\% to 24.43\%.
 
 The next useful comparisons are a paired evaluation of factorized ADMM solves, separate accounting of cold and reused preparation, and a noise sweep with fixed $\lambda$. Structured matrices, real signals and larger problems would extend the range of evidence. The present results support reporting objective accuracy, recovery error, iteration count and elapsed time together.
@@ -291,5 +477,12 @@ Amir Beck and Marc Teboulle. A fast iterative shrinkage-thresholding algorithm f
 Stephen Boyd and Lieven Vandenberghe. \emph{Convex Optimization}. Cambridge University Press, 2004. \url{https://web.stanford.edu/~boyd/cvxbook/}.
 \bibitem[Boyd et al.(2011)]{boyd2011}
 Stephen Boyd, Neal Parikh, Eric Chu, Borja Peleato and Jonathan Eckstein. Distributed optimization and statistical learning via the alternating direction method of multipliers. \emph{Foundations and Trends in Machine Learning}, 3(1):1--122, 2011. \url{https://web.stanford.edu/~boyd/papers/admm_distr_stats.html}.
+
+\bibitem[Tibshirani(1996)]{tibshirani1996}
+Robert Tibshirani. Regression shrinkage and selection via the lasso. \emph{Journal of the Royal Statistical Society: Series B}, 58(1):267--288, 1996. \url{https://doi.org/10.1111/j.2517-6161.1996.tb02080.x}.
+\bibitem[Parikh and Boyd(2014)]{parikh2014}
+Neal Parikh and Stephen Boyd. Proximal algorithms. \emph{Foundations and Trends in Optimization}, 1(3):123--231, 2014. \url{https://web.stanford.edu/~boyd/papers/prox_algs.html}.
+\bibitem[Tibshirani(2013)]{tibshirani2013}
+Ryan J. Tibshirani. The lasso problem and uniqueness. \emph{Electronic Journal of Statistics}, 7:1456--1490, 2013. \url{https://www.stat.cmu.edu/~ryantibs/papers/lassounique.pdf}.
 \end{thebibliography}
 \end{document}
